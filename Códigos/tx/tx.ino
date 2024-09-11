@@ -1,147 +1,154 @@
-#include <TinyGPS++.h>
-#include <SoftwareSerial.h>
-#include <LoRa.h>
-#include <avr/sleep.h>
-#include <avr/power.h>
-#include <avr/wdt.h>
- 
-// Define GPS serial communication pins
-#define rxGPS 4
-#define txGPS -1
-#define gpsControlPin 5
+#include <TinyGPS++.h>          // Biblioteca para manejar el GPS y procesar los datos NMEA
+#include <SoftwareSerial.h>     // Biblioteca para manejar la comunicación serial por software (utilizada para el GPS)
+#include <LoRa.h>               // Biblioteca para manejar la comunicación LoRa
+#include <avr/sleep.h>          // Biblioteca para manejar el modo de sueño del Arduino (bajo consumo)
+#include <avr/power.h>          // Biblioteca para apagar periféricos y ahorrar energía
+#include <avr/wdt.h>            // Biblioteca para configurar el temporizador Watchdog
 
-// Define LoRa parameters
-#define ss 10   // Pin for the CS (chip select)
-#define rst 8    // Pin for the RESET
-#define dio0 9   // Pin for the interrupt. Can be any digital pin.
- 
-TinyGPSPlus gps;    // GPS object
-SoftwareSerial gpsSerial(rxGPS, txGPS); // Serial connection to the GPS
- 
-volatile int f_wdt = 1; // Watchdog timer flag
- 
-// Watchdog timer interrupt service routine
+// Pines para la comunicación con el GPS
+#define rxGPS 4                 // Pin de recepción de datos del GPS
+#define txGPS -1                // Pin de transmisión de datos del GPS (no utilizado)
+#define gpsControlPin 5         // Pin de control del encendido y apagado del GPS
+
+// Pines para el módulo LoRa
+#define ss 10                   // Pin de CS (Chip Select) para el LoRa
+#define rst 8                   // Pin de reinicio del LoRa
+#define dio0 9                  // Pin para la interrupción del LoRa
+
+// Objeto GPS
+TinyGPSPlus gps;                
+SoftwareSerial gpsSerial(rxGPS, txGPS);  // Comunicación serial por software con el GPS
+
+volatile int f_wdt = 1;  // Flag para el temporizador Watchdog
+
+// Interrupción del temporizador Watchdog
 ISR(WDT_vect) {
   if (f_wdt == 0) {
-    f_wdt = 1;
+    f_wdt = 1;  // Cambiar el flag cuando el temporizador expire
   } else {
-    WDTCSR |= _BV(WDIE);
+    WDTCSR |= _BV(WDIE);  // Habilitar interrupción Watchdog
   }
 }
- 
+
+// Configuración inicial del sistema
 void setup() {
   
-  Serial.begin(9600); // Start serial communication at 9600 baud
-  gpsSerial.begin(9600); // Start GPS serial communication at 9600 baud
+  Serial.begin(9600);        // Iniciar comunicación serial para depuración a 9600 baudios
+  gpsSerial.begin(9600);     // Iniciar comunicación serial con el GPS a 9600 baudios
   Serial.println("GPS initialized...");
  
-  pinMode(gpsControlPin, OUTPUT);
-  digitalWrite(gpsControlPin, LOW);
+  pinMode(gpsControlPin, OUTPUT);  // Configurar el pin de control del GPS como salida
+  digitalWrite(gpsControlPin, LOW);  // Mantener el GPS apagado inicialmente
   
-  // Initialize LoRa with specific pins and frequency
+  // Inicializar el módulo LoRa con los pines definidos
   LoRa.setPins(ss, rst, dio0);
-  if (!LoRa.begin(433E6)) { // Start LoRa at 433 MHz
+  if (!LoRa.begin(433E6)) {  // Configurar LoRa en la frecuencia de 433 MHz
     Serial.println("Starting LoRa failed!");
-    while (1);
+    while (1);  // Si falla, quedarse en un bucle infinito
   }
   Serial.println("LoRa initialized...");
  
-  // Set sleep mode to power down mode for energy efficiency
+  // Configurar el modo sleep para ahorrar energía
   set_sleep_mode(SLEEP_MODE_PWR_DOWN);
 }
- 
+
+// Bucle principal del sistema
 void loop() {
   Serial.println("Enciendo GPS");
-  digitalWrite(gpsControlPin, HIGH);
+  digitalWrite(gpsControlPin, HIGH);  // Encender el GPS
 
-  bool gpsDataAcquired = false;
-  unsigned long startTime = millis();
-  unsigned long timeout = 300000; // 1 minute timeout for acquiring GPS data
+  bool gpsDataAcquired = false;       // Flag para verificar si se obtuvieron datos GPS
+  unsigned long startTime = millis(); // Tiempo inicial de espera
+  unsigned long timeout = 60000;     // Tiempo máximo de espera (1 minuto) para adquirir datos GPS
 
+  // Esperar hasta que se obtengan datos GPS o se exceda el tiempo de espera
   while ((millis() - startTime < timeout) && !gpsDataAcquired) {
-    if (gpsSerial.available()) {
-      if (gps.encode(gpsSerial.read())) {
-        if (gps.location.isValid()) {
-          gpsDataAcquired = true;
+    if (gpsSerial.available()) {  // Si hay datos disponibles del GPS
+      if (gps.encode(gpsSerial.read())) {  // Procesar los datos GPS
+        if (gps.location.isValid()) {  // Verificar si la ubicación es válida
+          gpsDataAcquired = true;  // Se obtuvieron datos GPS válidos
           Serial.println("Acquired");
         }
       }
     }
   }
 
+  // Si se obtuvieron datos GPS válidos
   if (gpsDataAcquired) {
-    // Store GPS data in strings
+    // Guardar los datos GPS en variables
     String lat = String(gps.location.lat(), 6);
     String lon = String(gps.location.lng(), 6);
     String speed = String(gps.speed.mps());
 
-    // Print the acquired GPS data to the Serial Monitor
+    // Imprimir los datos GPS en el monitor serial
     Serial.println("GPS data acquired...");
     Serial.println("LAT: " + lat);
     Serial.println("LONG: " + lon);
     Serial.println("SPEED: " + speed);
 
-    // Combine GPS data into one string to send
+    // Preparar los datos GPS en una cadena para enviar
     String dataToSend = "LAT:" + lat + ",LONG:" + lon + ",SPEED:" + speed;
 
-    // Begin LoRa transmission
+    // Iniciar la transmisión de datos por LoRa
     LoRa.beginPacket();
-    LoRa.print(dataToSend); // Send the GPS data string
-    int result = LoRa.endPacket(); // Finish LoRa transmission
+    LoRa.print(dataToSend);  // Enviar la cadena de datos GPS
+    int result = LoRa.endPacket();  // Finalizar la transmisión
 
-    // Check if the LoRa transmission was successful and print result to Serial Monitor
+    // Verificar si la transmisión LoRa fue exitosa
     if (result) {
       Serial.println("Packet transmission successful");
     } else {
       Serial.println("Packet transmission failed");
     }
   } else {
+    // Si no se pudieron adquirir datos GPS
     Serial.println("Failed to acquire GPS data");
   }
   
-
-  // Go to sleep mode to save energy
+  // Apagar el GPS para ahorrar energía
   digitalWrite(gpsControlPin, LOW);
   Serial.println("Apagué GPS");
-  Serial.println("Going to sleep now");
+  Serial.println("Entrando en modo sleep");
   Serial.println();
-  delay(2000);
-  // Bucle sleep
-  for (int i = 0; i < 2; i++) { // 38 * 8 seconds = 304 seconds (5 minutes and 4 seconds)
+  
+  delay(2000);  // Pausa antes de entrar en modo de sueño
+
+  // Entrar en modo de sueño por 5 minutos, utilizando el temporizador Watchdog
+  for (int i = 0; i < 2; i++) {  // 2 ciclos de 8 segundos = ~5 minutos
     f_wdt = 0;
-    setup_watchdog(9); // Set watchdog timer for approx 8 seconds
+    setup_watchdog(9);  // Configurar el temporizador Watchdog para aproximadamente 8 segundos
     while (f_wdt == 0) {
-      system_sleep();
+      system_sleep();  // Poner el sistema en modo de sueño
     }
   }
 
-  // Disable watchdog timer
+  // Deshabilitar el temporizador Watchdog después del ciclo de sueño
   wdt_disable();
-  delay(2000);
+  delay(2000);  // Pausa después del ciclo de sueño
 }
 
-// Function to put the system to sleep to save energy
+// Función para poner el sistema en modo de sueño
 void system_sleep() {
-  ADCSRA &= ~(1 << ADEN); // Switch Analog to Digital converter OFF
-  set_sleep_mode(SLEEP_MODE_PWR_DOWN); // Set sleep mode to power down mode
-  sleep_enable(); // Enable sleep mode
-  sleep_mode();  // System actually sleeps here
-  sleep_disable(); // Disable sleep mode
-  ADCSRA |= (1 << ADEN); // Switch Analog to Digital converter ON
+  ADCSRA &= ~(1 << ADEN);  // Apagar el convertidor analógico-digital (ADC) para ahorrar energía
+  set_sleep_mode(SLEEP_MODE_PWR_DOWN);  // Configurar el modo de sueño profundo
+  sleep_enable();  // Habilitar el modo de sueño
+  sleep_mode();  // Entrar en el modo de sueño
+  sleep_disable();  // Deshabilitar el modo de sueño al despertar
+  ADCSRA |= (1 << ADEN);  // Rehabilitar el ADC al despertar
 }
 
-// Function to set up watchdog timer
+// Configurar el temporizador Watchdog para controlar el tiempo de sueño
 void setup_watchdog(int i) {
   byte bb;
   int ww;
-  if (i > 9) i = 9; // Ensure that the interval does not exceed the maximum
+  if (i > 9) i = 9;  // Asegurar que el intervalo no exceda el máximo
   bb = i & 7;
-  if (i > 7) bb |= (1 << 5); // Set the correct bit for longer time intervals
-  bb |= (1 << WDCE); // Enable changes
+  if (i > 7) bb |= (1 << 5);  // Configurar el bit correcto para intervalos largos
+  bb |= (1 << WDCE);  // Habilitar cambios en el temporizador
   ww = bb;
 
-  MCUSR &= ~(1 << WDRF); // Reset the reset flag
-  WDTCSR |= (1 << WDCE) | (1 << WDE); // Start timed sequence
-  WDTCSR = bb; // Set new watchdog timeout value
-  WDTCSR |= _BV(WDIE); // Enable watchdog interrupt
+  MCUSR &= ~(1 << WDRF);  // Resetear la bandera de reinicio
+  WDTCSR |= (1 << WDCE) | (1 << WDE);  // Iniciar la secuencia de tiempo
+  WDTCSR = bb;  // Establecer el nuevo valor de tiempo del Watchdog
+  WDTCSR |= _BV(WDIE);  // Habilitar la interrupción del Watchdog
 }
