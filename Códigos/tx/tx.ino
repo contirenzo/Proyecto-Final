@@ -33,9 +33,8 @@ ISR(WDT_vect) {
 // Configuración inicial del sistema
 void setup() {
   
-  Serial.begin(9600);        // Iniciar comunicación serial para depuración a 9600 baudios
+  //Serial.begin(9600);        // Iniciar comunicación serial para depuración a 9600 baudios
   gpsSerial.begin(9600);     // Iniciar comunicación serial con el GPS a 9600 baudios
-  Serial.println("GPS initialized...");
  
   pinMode(gpsControlPin, OUTPUT);  // Configurar el pin de control del GPS como salida
   digitalWrite(gpsControlPin, LOW);  // Mantener el GPS apagado inicialmente
@@ -43,10 +42,10 @@ void setup() {
   // Inicializar el módulo LoRa con los pines definidos
   LoRa.setPins(ss, rst, dio0);
   if (!LoRa.begin(433E6)) {  // Configurar LoRa en la frecuencia de 433 MHz
-    Serial.println("Starting LoRa failed!");
+  //  Serial.println("Falla al inicializar Lora");
     while (1);  // Si falla, quedarse en un bucle infinito
   }
-  Serial.println("LoRa initialized...");
+  //Serial.println("LoRa inicializado");
  
   // Configurar el modo sleep para ahorrar energía
   set_sleep_mode(SLEEP_MODE_PWR_DOWN);
@@ -54,7 +53,7 @@ void setup() {
 
 // Bucle principal del sistema
 void loop() {
-  Serial.println("Enciendo GPS");
+  //Serial.println("Enciendo GPS");
   digitalWrite(gpsControlPin, HIGH);  // Encender el GPS
 
   bool gpsDataAcquired = false;       // Flag para verificar si se obtuvieron datos GPS
@@ -81,10 +80,10 @@ void loop() {
     String speed = String(gps.speed.mps());
 
     // Imprimir los datos GPS en el monitor serial
-    Serial.println("GPS data acquired...");
-    Serial.println("LAT: " + lat);
-    Serial.println("LONG: " + lon);
-    Serial.println("SPEED: " + speed);
+    // Serial.println("GPS data acquired...");
+    // Serial.println("LAT: " + lat);
+    // Serial.println("LONG: " + lon);
+    // Serial.println("SPEED: " + speed);
 
     // Preparar los datos GPS en una cadena para enviar
     String dataToSend = "LAT:" + lat + ",LONG:" + lon + ",SPEED:" + speed;
@@ -95,26 +94,25 @@ void loop() {
     int result = LoRa.endPacket();  // Finalizar la transmisión
 
     // Verificar si la transmisión LoRa fue exitosa
-    if (result) {
-      Serial.println("Packet transmission successful");
-    } else {
-      Serial.println("Packet transmission failed");
-    }
+    // if (result) {
+    //   Serial.println("Transmisión exitosa");
+    // } else {
+    //   Serial.println("Falla de transimisión");
+    // }
   } else {
     // Si no se pudieron adquirir datos GPS
-    Serial.println("Failed to acquire GPS data");
+    //Serial.println("Failed to acquire GPS data");
   }
   
   // Apagar el GPS para ahorrar energía
   digitalWrite(gpsControlPin, LOW);
-  Serial.println("Apagué GPS");
-  Serial.println("Entrando en modo sleep");
-  Serial.println();
+  //Serial.println("Apago GPS");
+  //Serial.println("Entrando en modo sleep");
   
   delay(2000);  // Pausa antes de entrar en modo de sueño
 
   // Entrar en modo de sueño por 5 minutos, utilizando el temporizador Watchdog
-  for (int i = 0; i < 2; i++) {  // 2 ciclos de 8 segundos = ~5 minutos
+  for (int i = 0; i < 225; i++) {  // 225 ciclos de ~8 segundos = ~30 minutos
     f_wdt = 0;
     setup_watchdog(9);  // Configurar el temporizador Watchdog para aproximadamente 8 segundos
     while (f_wdt == 0) {

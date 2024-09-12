@@ -10,7 +10,7 @@
 #define dio0 4  // Pin para las interrupciones
 
 // Credenciales de la red Wi-Fi
-const char* ssid = "iPhone de Nico";  // Nombre de la red Wi-Fi
+const char* ssid = "";  // Nombre de la red Wi-Fi
 const char* pass = "12345689";        // Contraseña de la red Wi-Fi
 
 // Credenciales de conexión a ThingsBoard
@@ -27,36 +27,36 @@ ThingsBoard tb(mqttClient, MAX_MESSAGE_SIZE);
 
 // Función para conectar el ESP32 a la red Wi-Fi
 void connectToWiFi() {
-  Serial.println("Connecting to WiFi...");
-  int attempts = 0;
+  //Serial.println("Conectando al WiFi...");
+  int intentos = 0;
 
   // Intentar conectar a Wi-Fi hasta un máximo de 20 intentos
   while (WiFi.status() != WL_CONNECTED && attempts < 20) {
     WiFi.mode(WIFI_STA);  // Modo estación (cliente Wi-Fi)
     WiFi.begin(ssid, pass);  // Conectar a la red con el SSID y contraseña
     delay(500);  // Pausa para dar tiempo a la conexión
-    Serial.print(".");
-    attempts++;
+    //Serial.print(".");
+    intentos++;
   }
 
   // Verificar si la conexión fue exitosa o falló
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("\nFailed to connect to WiFi.");
-  } else {
-    Serial.println("\nConnected to WiFi");
-  }
+  //if (WiFi.status() != WL_CONNECTED) {
+  //  Serial.println("Falla al conectar al WiFi.");
+  //} else {
+  //  Serial.println("Conectado al WiFi");
+  //}
 }
 
 // Función para conectarse a ThingsBoard
 void connectToThingsBoard() {
   if (!tb.connected()) {  // Verificar si ya está conectado
-    Serial.println("Connecting to ThingsBoard server");
+    //Serial.println("Conectando ThingsBoard server");
 
     // Intentar conectarse al servidor de ThingsBoard
     if (!tb.connect(TB_SERVER, TOKEN)) {
-      Serial.println("Failed to connect to ThingsBoard");
+    //  Serial.println("Falla al conectar a ThingsBoard");
     } else {
-      Serial.println("Connected to ThingsBoard");
+    //  Serial.println("Conectado to ThingsBoard");
     }
   }
 }
@@ -68,20 +68,19 @@ void sendDataToThingsBoard(float lat, float lon, float speed) {
   
   // Enviar los datos de telemetría a ThingsBoard
   tb.sendTelemetryJson(jsonData.c_str());
-  Serial.println("Data sent to ThingsBoard: " + jsonData);
+  //Serial.println("Datos enviados a ThingsBoard: " + jsonData);
 }
 
 // Función setup, que se ejecuta una sola vez al inicio
 void setup() {
-  Serial.begin(115200);  // Iniciar la comunicación serial a 115200 baudios
-  Serial.println("LoRa Receiver");
+  //Serial.begin(115200);  // Iniciar la comunicación serial a 115200 baudios
 
   // Configurar los pines del módulo LoRa
   LoRa.setPins(ss, rst, dio0);
   
   // Iniciar el módulo LoRa en la frecuencia de 433 MHz
   if (!LoRa.begin(433E6)){  
-    Serial.println("Starting LoRa failed!");
+    //Serial.println("Falla al inicilizar LoRa");
     while (1);  // Si falla, se queda en un bucle infinito
   }
 
@@ -97,7 +96,7 @@ void loop() {
   int packetSize = LoRa.parsePacket();  // Verificar si hay un paquete de datos disponible
   
   if (packetSize) {  // Si se recibió un paquete
-    Serial.println("Received packet:");
+    //Serial.println("Paquete recibido:");
 
     String incoming = "";  // Variable para almacenar los datos recibidos
     while (LoRa.available()) {
@@ -115,20 +114,20 @@ void loop() {
     float speed = incoming.substring(speedIndex + 7).toFloat();
 
     // Imprimir los datos recibidos en el monitor serial
-    String latString = String(lat, 6);
-    String lonString = String(lon, 6);
-    String speedString = String(speed, 2) + " kmph";
+    // String latString = String(lat, 6);
+    // String lonString = String(lon, 6);
+    // String speedString = String(speed, 2) + " kmph";
 
-    Serial.print("Latitude: ");
-    Serial.println(latString);
-    Serial.print("Longitude: ");
-    Serial.println(lonString);
-    Serial.print("Speed: ");
-    Serial.println(speedString);
+    // Serial.print("Latitude: ");
+    // Serial.println(latString);
+    // Serial.print("Longitude: ");
+    // Serial.println(lonString);
+    // Serial.print("Speed: ");
+    // Serial.println(speedString);
 
-    // Mostrar la intensidad de la señal recibida
-    Serial.print("RSSI: ");
-    Serial.println(LoRa.packetRssi());
+    // // Mostrar la intensidad de la señal recibida
+    // Serial.print("RSSI: ");
+    // Serial.println(LoRa.packetRssi());
 
     // Verificar si la conexión con ThingsBoard está activa
     if (!tb.connected()) {
